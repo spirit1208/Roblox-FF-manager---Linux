@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Roblox Fast Flags Manager - GUI Application
-A simple GUI to manage Roblox Fast Flags on Linux
+With Export/Import functionality for large configurations
 """
 
 import os
@@ -15,7 +15,7 @@ class RobloxFlagsManager:
     def __init__(self, root):
         self.root = root
         self.root.title("Roblox Fast Flags Manager")
-        self.root.geometry("700x600")
+        self.root.geometry("800x650")
         self.root.resizable(True, True)
         
         # Configuration
@@ -43,11 +43,11 @@ class RobloxFlagsManager:
         # Title
         title_label = ttk.Label(main_frame, text="Roblox Fast Flags Manager", 
                                font=("Arial", 16, "bold"))
-        title_label.grid(row=0, column=0, columnspan=2, pady=(0, 20))
+        title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20))
         
         # Input frame
         input_frame = ttk.LabelFrame(main_frame, text="Add New Flag", padding="10")
-        input_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
+        input_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(0, 10))
         input_frame.columnconfigure(1, weight=1)
         
         # Flag name
@@ -62,11 +62,11 @@ class RobloxFlagsManager:
         
         # Add button
         self.add_button = ttk.Button(input_frame, text="Add Flag", command=self.add_flag)
-        self.add_button.grid(row=2, column=0, columnspan=2, pady=10)
+        self.add_button.grid(row=2, column=0, columnspan=3, pady=10)
         
         # Flags list frame
         list_frame = ttk.LabelFrame(main_frame, text="Current Flags", padding="10")
-        list_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
+        list_frame.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
         list_frame.columnconfigure(0, weight=1)
         list_frame.rowconfigure(1, weight=1)
         
@@ -106,7 +106,7 @@ class RobloxFlagsManager:
         
         # Action buttons frame
         action_frame = ttk.Frame(main_frame)
-        action_frame.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
+        action_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
         
         # Apply button
         self.apply_button = ttk.Button(action_frame, text="Apply Flags to Roblox", 
@@ -118,12 +118,21 @@ class RobloxFlagsManager:
                                        command=self.reset_flags)
         self.reset_button.grid(row=0, column=1, padx=(0, 5))
         
+        # Export/Import buttons
+        self.export_button = ttk.Button(action_frame, text="Export Flags", 
+                                        command=self.export_flags)
+        self.export_button.grid(row=0, column=2, padx=(0, 5))
+        
+        self.import_button = ttk.Button(action_frame, text="Import Flags", 
+                                        command=self.import_flags)
+        self.import_button.grid(row=0, column=3, padx=(0, 5))
+        
         # Status bar
         self.status_var = tk.StringVar()
         self.status_var.set("Ready")
         status_bar = ttk.Label(main_frame, textvariable=self.status_var, 
                                relief=tk.SUNKEN, anchor=tk.W)
-        status_bar.grid(row=4, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(10, 0))
+        status_bar.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(10, 0))
         
     def load_flags(self):
         """Load flags from configuration file"""
@@ -273,6 +282,155 @@ class RobloxFlagsManager:
             self.save_flags()
             self.refresh_flags_list()
             self.status_var.set("Flags reset to default")
+    
+    def export_flags(self):
+        """Export flags to a JSON file"""
+        if not self.flags:
+            messagebox.showwarning("Warning", "No flags to export")
+            return
+        
+        # Ask user for file location
+        file_path = filedialog.asksaveasfilename(
+            title="Export Fast Flags",
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+            initialdir=str(Path.home() / "Documents")
+        )
+        
+        if file_path:
+            try:
+                # Create export data with metadata
+                export_data = {
+                    "metadata": {
+                        "exported_by": "Roblox Fast Flags Manager",
+                        "flag_count": len(self.flags),
+                        "version": "1.0"
+                    },
+                    "fast_flags": self.flags
+                }
+                
+                with open(file_path, 'w') as f:
+                    json.dump(export_data, f, indent=2)
+                
+                self.status_var.set(f"Exported {len(self.flags)} flags to {Path(file_path).name}")
+                messagebox.showinfo("Export Successful", 
+                                  f"Successfully exported {len(self.flags)} flags to:\n{file_path}")
+                
+            except Exception as e:
+                self.status_var.set("Export failed")
+                messagebox.showerror("Export Error", f"Failed to export flags: {str(e)}")
+    
+    def import_flags(self):
+        """Import flags from a JSON file"""
+        # Ask user for file location
+        file_path = filedialog.askopenfilename(
+            title="Import Fast Flags",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+            initialdir=str(Path.home() / "Documents")
+        )
+        
+        if not file_path:
+            return
+        
+        try:
+            with open(file_path, 'r') as f:
+                import_data = json.load(f)
+            
+            # Handle different import formats
+            if isinstance(import_data, dict):
+                if "fast_flags" in import_data:
+                    # New format with metadata
+                    imported_flags = import_data["fast_flags"]
+                    metadata = import_data.get("metadata", {})
+                    flag_count = metadata.get("flag_count", len(imported_flags))
+                else:
+                    # Old format - direct flags dictionary
+                    imported_flags = import_data
+                    flag_count = len(imported_flags)
+            else:
+                messagebox.showerror("Import Error", "Invalid file format. Expected a JSON object.")
+                return
+            
+            if not imported_flags:
+                messagebox.showwarning("Warning", "No flags found in the imported file.")
+                return
+            
+            # Ask user about merge strategy
+            merge_dialog = tk.Toplevel(self.root)
+            merge_dialog.title("Import Flags")
+            merge_dialog.geometry("500x300")
+            merge_dialog.resizable(False, False)
+            merge_dialog.transient(self.root)
+            merge_dialog.grab_set()
+            
+            # Center dialog
+            merge_dialog.update_idletasks()
+            x = (merge_dialog.winfo_screenwidth() // 2) - (merge_dialog.winfo_width() // 2)
+            y = (merge_dialog.winfo_screenheight() // 2) - (merge_dialog.winfo_height() // 2)
+            merge_dialog.geometry(f"+{x}+{y}")
+            
+            # Widgets
+            ttk.Label(merge_dialog, text=f"Importing {flag_count} flags from:").grid(row=0, column=0, sticky=tk.W, pady=10, padx=10)
+            ttk.Label(merge_dialog, text=Path(file_path).name, font=("Arial", 10, "bold")).grid(row=0, column=1, sticky=tk.W, pady=10, padx=10)
+            
+            ttk.Label(merge_dialog, text="Choose import option:").grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=10, padx=10)
+            
+            # Radio buttons for merge strategy
+            self.merge_strategy = tk.StringVar(value="merge")
+            
+            ttk.Radiobutton(merge_dialog, text="Merge with existing flags (recommended)", 
+                           variable=self.merge_strategy, value="merge").grid(row=2, column=0, sticky=tk.W, pady=5, padx=10)
+            
+            ttk.Radiobutton(merge_dialog, text="Replace all existing flags", 
+                           variable=self.merge_strategy, value="replace").grid(row=3, column=0, sticky=tk.W, pady=5, padx=10)
+            
+            ttk.Radiobutton(merge_dialog, text="Create backup and then replace", 
+                           variable=self.merge_strategy, value="backup_replace").grid(row=4, column=0, sticky=tk.W, pady=5, padx=10)
+            
+            def confirm_import():
+                strategy = self.merge_strategy.get()
+                
+                if strategy == "backup_replace":
+                    # Create backup first
+                    backup_data = {
+                        "metadata": {
+                            "backup_reason": "Before importing new flags",
+                            "original_flag_count": len(self.flags),
+                            "backup_timestamp": str(Path(file_path).stat().st_mtime)
+                        },
+                        "fast_flags": self.flags.copy()
+                    }
+                    
+                    backup_path = Path(file_path).parent / f"backup_{Path(file_path).stem}.json"
+                    with open(backup_path, 'w') as f:
+                        json.dump(backup_data, f, indent=2)
+                    
+                    self.flags = imported_flags.copy()
+                    messagebox.showinfo("Backup Created", f"Backup saved to:\n{backup_path}")
+                    
+                elif strategy == "replace":
+                    if messagebox.askyesno("Confirm", "This will replace all current flags. Continue?"):
+                        self.flags = imported_flags.copy()
+                    else:
+                        return
+                else:  # merge
+                    # Merge flags (new flags will overwrite existing ones with same name)
+                    self.flags.update(imported_flags)
+                
+                self.save_flags()
+                self.refresh_flags_list()
+                merge_dialog.destroy()
+                
+                self.status_var.set(f"Imported {len(imported_flags)} flags from {Path(file_path).name}")
+                messagebox.showinfo("Import Successful", 
+                                  f"Successfully imported {len(imported_flags)} flags.")
+            
+            # Buttons
+            button_frame = ttk.Frame(merge_dialog)
+            button_frame.grid(row=5, column=0, columnspan=2, pady=20)
+            
+            ttk.Button(button_frame, text="Import", command=confirm_import).grid(row=0, column=0, padx=5)
+            ttk.Button(button_frame, text="Cancel", command=merge_dialog.destroy).grid(row=0, column=1, padx=5)
     
     def find_roblox_installation(self):
         """Find Roblox installation path"""
